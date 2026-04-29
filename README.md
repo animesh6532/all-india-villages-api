@@ -206,13 +206,7 @@ The `/analytics/overview` endpoint + React charts show:
 
 Logs every request to `api_logs` table.
 
-## 🖼️ Screenshots
 
-<div align=\"center\">
-<img src=\"./screenshots/dashboard.png\" width=\"32%\" />
-<img src=\"./screenshots/search.png\" width=\"32%\" />
-<img src=\"./screenshots/analytics.png\" width=\"32%\" />
-</div>
 
 ## ⚡ Challenges Overcome
 
@@ -244,8 +238,8 @@ This project is [MIT](LICENSE) licensed.
 
 ## 👨‍💻 Author
 
-**Your Name** - Full-Stack Engineer  
-[LinkedIn](https://linkedin.com/in/yourprofile) | [Portfolio](https://yourportfolio.com) | your.email@example.com
+**Animesh Sahoo** - Full-Stack Engineer  
+[LinkedIn](https://linkedin.com/in/animesh-sahoo-b03151302) | [Portfolio](https://animesh6532.netlify.app/) | animeshsahoo451@gmail.com
 
 Built as capstone project showcasing production SaaS patterns.
 
