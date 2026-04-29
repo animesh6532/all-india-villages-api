@@ -1,12 +1,25 @@
 const searchService = require("../services/searchService");
+
 const { success } = require("../utils/response");
 
+
 async function search(req, res, next) {
+
   try {
-    success(res, await searchService.search(req.query));
+
+    const result = await searchService.search(req.query);
+
+    success(res, result);
+
   } catch (error) {
+
     next(error);
+
   }
+
 }
 
-module.exports = { search };
+
+module.exports = {
+  search
+};

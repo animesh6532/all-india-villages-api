@@ -1,28 +1,49 @@
 const { ApiClient } = require("../models");
-const ApiError = require("../utils/apiError");
-const { hashSecret } = require("../utils/crypto");
 
-async function authenticateApiKey(req, _res, next) {
+const authenticateApiKey = async (req, res, next) => {
   try {
-    const apiKey = req.header("x-api-key");
-    const apiSecret = req.header("x-api-secret");
+
+    const apiKey = req.headers["x-api-key"];
+    const apiSecret = req.headers["x-api-secret"];
 
     if (!apiKey || !apiSecret) {
-      throw new ApiError(401, "Missing API credentials. Provide x-api-key and x-api-secret headers.");
+      return res.status(401).json({
+        success: false,
+        message: "API credentials required.",
+        details: null
+      });
     }
 
-    const client = await ApiClient.findOne({ where: { apiKey, isActive: true } });
-    if (!client || client.secretHash !== hashSecret(apiSecret)) {
-      throw new ApiError(401, "Invalid API credentials.");
+    const client = await ApiClient.findOne({
+      where: {
+        apiKey,
+        apiSecret,
+        isActive: true
+      }
+    });
+
+    if (!client) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid API credentials.",
+        details: null
+      });
     }
 
     req.apiClient = client;
-    client.lastUsedAt = new Date();
-    await client.save();
-    return next();
+
+    next();
+
   } catch (error) {
-    return next(error);
+
+    console.error(error);
+
+    return res.status(500).json({
+      success: false,
+      message: "Authentication failed.",
+      details: null
+    });
   }
-}
+};
 
 module.exports = authenticateApiKey;

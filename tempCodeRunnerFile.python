@@ -1,0 +1,5 @@
+import pandas as pd
+
+df = pd.read_csv("dataset/cleaned/Rdir_2011_19_WEST_BENGAL.csv")
+
+print(df.columns)

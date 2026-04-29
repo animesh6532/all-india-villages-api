@@ -1,88 +1,200 @@
-import argparse
-import os
-from pathlib import Path
-
-import pandas as pd
 import psycopg2
-from dotenv import load_dotenv
-from psycopg2.extras import execute_values
+import pandas as pd
+from slugify import slugify
+
+DB_CONFIG = {
+    "host": "localhost",
+    "database": "villages_db",
+    "user": "postgres",
+    "password": "postgres123",
+    "port": 5432
+}
 
 
-ROOT = Path(__file__).resolve().parents[2]
-CLEAN_DIR = ROOT / "dataset" / "cleaned"
+def safe_int(value):
+    if pd.isna(value):
+        return None
+    return int(value)
 
 
-def connect():
-    load_dotenv(ROOT / "backend" / ".env")
-    return psycopg2.connect(
-        host=os.getenv("DB_HOST", "localhost"),
-        port=os.getenv("DB_PORT", "5432"),
-        dbname=os.getenv("DB_NAME", "india_villages"),
-        user=os.getenv("DB_USER", "postgres"),
-        password=os.getenv("DB_PASSWORD", "postgres"),
-    )
+def import_states(cursor):
+
+    df = pd.read_csv("dataset/cleaned/states.csv")
+
+    inserted = set()
+
+    for _, row in df.iterrows():
+
+        state_id = safe_int(row["id"])
+
+        if state_id in inserted:
+            continue
+
+        inserted.add(state_id)
+
+        cursor.execute("""
+            INSERT INTO states (
+                id,
+                name,
+                slug
+            )
+            VALUES (%s, %s, %s)
+            ON CONFLICT DO NOTHING
+        """, (
+            state_id,
+            row["name"],
+            slugify(str(row["name"]))
+        ))
 
 
-def rows_from_csv(name, columns):
-    path = CLEAN_DIR / name
-    if not path.exists():
-        raise FileNotFoundError(f"Missing {path}. Run clean_dataset.py first.")
-    df = pd.read_csv(path).where(pd.notna, None)
-    return [tuple(row[column] for column in columns) for _, row in df.iterrows()]
+def import_districts(cursor):
+
+    df = pd.read_csv("dataset/cleaned/districts.csv")
+
+    inserted = set()
+
+    for _, row in df.iterrows():
+
+        district_id = safe_int(row["id"])
+
+        if district_id in inserted:
+            continue
+
+        inserted.add(district_id)
+
+        cursor.execute("""
+            INSERT INTO districts (
+                id,
+                state_id,
+                name,
+                slug
+            )
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT DO NOTHING
+        """, (
+            district_id,
+            safe_int(row["state_id"]),
+            row["name"],
+            slugify(str(row["name"]))
+        ))
 
 
-def upsert(cursor, table, columns, conflict, update_columns):
-    rows = rows_from_csv(f"{table}.csv", columns)
-    placeholders = ", ".join(columns)
-    updates = ", ".join(f"{column} = EXCLUDED.{column}" for column in update_columns)
-    sql = f"""
-        INSERT INTO {table} ({placeholders}, created_at, updated_at)
-        VALUES %s
-        ON CONFLICT ({conflict}) DO UPDATE SET {updates}, updated_at = NOW()
-    """
-    values = rows
-    template = "(" + ", ".join(["%s"] * len(columns)) + ", NOW(), NOW())"
-    execute_values(cursor, sql, values, template=template, page_size=5000)
-    print(f"Imported {len(rows):,} rows into {table}")
+def import_subdistricts(cursor):
+
+    df = pd.read_csv("dataset/cleaned/subdistricts.csv")
+
+    inserted = set()
+
+    # Fetch valid district IDs from DB
+    cursor.execute("SELECT id FROM districts")
+    valid_districts = {row[0] for row in cursor.fetchall()}
+
+    for _, row in df.iterrows():
+
+        subdistrict_id = safe_int(row["id"])
+        district_id = safe_int(row["district_id"])
+
+        if subdistrict_id in inserted:
+            continue
+
+        # Skip invalid foreign keys
+        if district_id not in valid_districts:
+            continue
+
+        inserted.add(subdistrict_id)
+
+        cursor.execute("""
+            INSERT INTO subdistricts (
+                id,
+                district_id,
+                name,
+                slug
+            )
+            VALUES (%s, %s, %s, %s)
+            ON CONFLICT DO NOTHING
+        """, (
+            subdistrict_id,
+            district_id,
+            row["name"],
+            slugify(str(row["name"]))
+        ))
+
+
+def import_villages(cursor):
+
+    df = pd.read_csv("dataset/cleaned/villages.csv")
+
+    inserted = set()
+
+    # Fetch valid subdistrict IDs
+    cursor.execute("SELECT id FROM subdistricts")
+    valid_subdistricts = {row[0] for row in cursor.fetchall()}
+
+    for _, row in df.iterrows():
+
+        village_id = safe_int(row["id"])
+        subdistrict_id = safe_int(row["subdistrict_id"])
+
+        if village_id in inserted:
+            continue
+
+        # Skip invalid foreign keys
+        if subdistrict_id not in valid_subdistricts:
+            continue
+
+        inserted.add(village_id)
+
+        population = None
+
+        if "population" in df.columns and pd.notna(row["population"]):
+            population = int(row["population"])
+
+        cursor.execute("""
+            INSERT INTO villages (
+                id,
+                subdistrict_id,
+                name,
+                slug,
+                population
+            )
+            VALUES (%s, %s, %s, %s, %s)
+            ON CONFLICT DO NOTHING
+        """, (
+            village_id,
+            subdistrict_id,
+            row["name"],
+            slugify(str(row["name"])),
+            population
+        ))
 
 
 def main():
-    parser = argparse.ArgumentParser(description="Import cleaned India villages CSV files into PostgreSQL.")
-    parser.add_argument("--truncate", action="store_true", help="Truncate normalized tables before import.")
-    args = parser.parse_args()
 
-    with connect() as connection:
-        with connection.cursor() as cursor:
-            if args.truncate:
-                cursor.execute("TRUNCATE api_logs, villages, subdistricts, districts, states RESTART IDENTITY CASCADE;")
+    print("Connecting to PostgreSQL...")
 
-            upsert(cursor, "states", ["id", "census_code", "name", "slug"], "id", ["census_code", "name", "slug"])
-            upsert(
-                cursor,
-                "districts",
-                ["id", "state_id", "census_code", "name", "slug"],
-                "id",
-                ["state_id", "census_code", "name", "slug"],
-            )
-            upsert(
-                cursor,
-                "subdistricts",
-                ["id", "district_id", "census_code", "name", "slug"],
-                "id",
-                ["district_id", "census_code", "name", "slug"],
-            )
-            upsert(
-                cursor,
-                "villages",
-                ["id", "subdistrict_id", "census_code", "name", "slug", "population"],
-                "id",
-                ["subdistrict_id", "census_code", "name", "slug", "population"],
-            )
-            for table in ["states", "districts", "subdistricts", "villages"]:
-                cursor.execute(
-                    f"SELECT setval(pg_get_serial_sequence('{table}', 'id'), COALESCE((SELECT MAX(id) FROM {table}), 1));"
-                )
-        connection.commit()
+    conn = psycopg2.connect(**DB_CONFIG)
+
+    cursor = conn.cursor()
+
+    print("Importing states...")
+    import_states(cursor)
+
+    print("Importing districts...")
+    import_districts(cursor)
+
+    print("Importing subdistricts...")
+    import_subdistricts(cursor)
+
+    print("Importing villages...")
+    import_villages(cursor)
+
+    conn.commit()
+
+    cursor.close()
+
+    conn.close()
+
+    print("Import completed successfully!")
 
 
 if __name__ == "__main__":

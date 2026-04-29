@@ -1,54 +1,85 @@
 const { Op } = require("sequelize");
-const { State, District, Subdistrict, Village } = require("../models");
-const { getPagination, paginatedResponse } = require("../utils/pagination");
+
+const {
+  State,
+  District,
+  Village
+} = require("../models");
 
 async function search(query) {
-  const pagination = getPagination(query);
 
-  if (query.village) {
-    const result = await Village.findAndCountAll({
-      where: { name: { [Op.iLike]: `%${query.village}%` } },
-      include: [
-        {
-          model: Subdistrict,
-          as: "subdistrict",
-          attributes: ["id", "name"],
-          include: [
-            {
-              model: District,
-              as: "district",
-              attributes: ["id", "name"],
-              include: [{ model: State, as: "state", attributes: ["id", "name"] }]
-            }
-          ]
+  const {
+    type,
+    value,
+    limit = 10
+  } = query;
+
+  const searchValue = `%${value}%`;
+
+  // SEARCH STATES
+  if (type === "state") {
+
+    const states = await State.findAll({
+      where: {
+        name: {
+          [Op.iLike]: searchValue
         }
-      ],
-      distinct: true,
-      limit: pagination.limit,
-      offset: pagination.offset,
-      order: [["name", "ASC"]]
+      },
+      limit: Number(limit)
     });
-    return { type: "village", ...paginatedResponse(result, pagination) };
+
+    return {
+      type: "state",
+      count: states.length,
+      data: states
+    };
   }
 
-  if (query.district) {
-    const result = await District.findAndCountAll({
-      where: { name: { [Op.iLike]: `%${query.district}%` } },
-      include: [{ model: State, as: "state", attributes: ["id", "name"] }],
-      limit: pagination.limit,
-      offset: pagination.offset,
-      order: [["name", "ASC"]]
+  // SEARCH DISTRICTS
+  if (type === "district") {
+
+    const districts = await District.findAll({
+      where: {
+        name: {
+          [Op.iLike]: searchValue
+        }
+      },
+      limit: Number(limit)
     });
-    return { type: "district", ...paginatedResponse(result, pagination) };
+
+    return {
+      type: "district",
+      count: districts.length,
+      data: districts
+    };
   }
 
-  const result = await State.findAndCountAll({
-    where: { name: { [Op.iLike]: `%${query.state}%` } },
-    limit: pagination.limit,
-    offset: pagination.offset,
-    order: [["name", "ASC"]]
-  });
-  return { type: "state", ...paginatedResponse(result, pagination) };
+  // SEARCH VILLAGES
+  if (type === "village") {
+
+    const villages = await Village.findAll({
+      where: {
+        name: {
+          [Op.iLike]: searchValue
+        }
+      },
+      limit: Number(limit)
+    });
+
+    return {
+      type: "village",
+      count: villages.length,
+      data: villages
+    };
+  }
+
+  return {
+    type,
+    count: 0,
+    data: []
+  };
 }
 
-module.exports = { search };
+module.exports = {
+  search
+};

@@ -7,24 +7,52 @@ const paginationSchema = Joi.object({
   districtId: Joi.number().integer().positive(),
   subdistrictId: Joi.number().integer().positive(),
   q: Joi.string().trim().min(2).max(120),
-  sort: Joi.string().valid("name", "-name", "createdAt", "-createdAt").default("name")
+  sort: Joi.string()
+    .valid("name", "-name", "createdAt", "-createdAt")
+    .default("name")
 }).unknown(true);
 
 const idParamSchema = Joi.object({
   id: Joi.number().integer().positive().required()
 });
 
+
+// ✅ UPDATED SEARCH SCHEMA
 const searchSchema = Joi.object({
-  village: Joi.string().trim().min(2).max(160),
-  district: Joi.string().trim().min(2).max(140),
-  state: Joi.string().trim().min(2).max(120),
-  page: Joi.number().integer().min(1).default(1),
-  limit: Joi.number().integer().min(1).max(100).default(25)
-}).or("village", "district", "state");
+  type: Joi.string()
+    .valid("village", "district", "state")
+    .required(),
+
+  value: Joi.string()
+    .trim()
+    .min(1)
+    .max(160)
+    .required(),
+
+  page: Joi.number()
+    .integer()
+    .min(1)
+    .default(1),
+
+  limit: Joi.number()
+    .integer()
+    .min(1)
+    .max(100)
+    .default(25)
+});
 
 const generateKeySchema = Joi.object({
-  name: Joi.string().trim().min(2).max(160).required(),
-  email: Joi.string().trim().email().max(180).required()
+  name: Joi.string()
+    .trim()
+    .min(2)
+    .max(160)
+    .required(),
+
+  email: Joi.string()
+    .trim()
+    .email()
+    .max(180)
+    .required()
 });
 
 module.exports = {

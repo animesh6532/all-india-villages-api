@@ -1,10 +1,6 @@
 "use strict";
 
-const crypto = require("crypto");
-
-function hashSecret(secret) {
-  return crypto.createHash("sha256").update(secret).digest("hex");
-}
+const { hashSecret } = require("../../src/utils/crypto");
 
 module.exports = {
   async up(queryInterface) {
@@ -41,7 +37,7 @@ module.exports = {
         name: process.env.DEFAULT_CLIENT_NAME || "Demo Client",
         email: process.env.DEFAULT_CLIENT_EMAIL || "demo@example.com",
         api_key: process.env.DEFAULT_API_KEY || "demo_key_123456",
-        secret_hash: hashSecret(process.env.DEFAULT_API_SECRET || "demo_secret_123456"),
+        api_secret: hashSecret(process.env.DEFAULT_API_SECRET || "demo_secret_123456"),
         is_active: true,
         created_at: new Date(),
         updated_at: new Date()

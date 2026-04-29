@@ -11,7 +11,7 @@ async function generateKey(payload) {
       name: payload.name,
       email: payload.email,
       apiKey,
-      secretHash: hashSecret(apiSecret),
+      apiSecret: hashSecret(apiSecret),
       isActive: true
     }
   });
@@ -19,7 +19,7 @@ async function generateKey(payload) {
   if (!created) {
     client.name = payload.name;
     client.apiKey = apiKey;
-    client.secretHash = hashSecret(apiSecret);
+    client.apiSecret = hashSecret(apiSecret);
     client.isActive = true;
     await client.save();
   }

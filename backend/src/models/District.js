@@ -1,4 +1,5 @@
 const { DataTypes } = require("sequelize");
+
 const sequelize = require("../config/database");
 
 const District = sequelize.define(
@@ -9,20 +10,24 @@ const District = sequelize.define(
       autoIncrement: true,
       primaryKey: true
     },
+
     stateId: {
       type: DataTypes.INTEGER,
       allowNull: false,
       field: "state_id"
     },
+
     censusCode: {
       type: DataTypes.STRING(20),
       allowNull: true,
       field: "census_code"
     },
+
     name: {
       type: DataTypes.STRING(140),
       allowNull: false
     },
+
     slug: {
       type: DataTypes.STRING(160),
       allowNull: false
@@ -30,10 +35,18 @@ const District = sequelize.define(
   },
   {
     tableName: "districts",
+
+    timestamps: true,
+
     underscored: true,
+
     indexes: [
       { fields: ["state_id"] },
-      { unique: true, fields: ["state_id", "slug"] }
+
+      {
+        unique: true,
+        fields: ["state_id", "slug"]
+      }
     ]
   }
 );
